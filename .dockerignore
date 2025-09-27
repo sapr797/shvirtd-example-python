@@ -1,0 +1,54 @@
+# Исключаем ненужные файлы для Docker образа
+
+# Файлы Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+.tox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git/
+.mypy_cache/
+.pytest_cache/
+.hypothesis/
+
+# Файлы операционной системы
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Файлы IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker файлы
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose.*.yml
+
+# Логи и временные файлы
+*.log
+tmp/
+temp/
+
+# Файлы документации
+docs/
+*.md
+!README.md
