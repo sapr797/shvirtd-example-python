@@ -2,164 +2,143 @@ from datetime import datetime
 import os
 from contextlib import contextmanager
 import mysql.connector
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from dotenv import load_dotenv
 
-# Загрузка переменных окружения
+# Загрузка переменных окружения из файла .env
 load_dotenv()
 
 app = FastAPI(
-    title="FastAPI MySQL Application",
-    description="Обновленное приложение с конфигурацией через переменные окружения",
-    version="2.0.0"
+    title="Shvirtd Example FastAPI",
+    description="Учебный проект для изучения Docker Compose и FastAPI.",
+    version="1.0.0"
 )
 
-# Конфигурация из переменных окружения
-DB_CONFIG = {
+# Конфигурация БД из переменных окружения
+db_config = {
     'host': os.getenv('DB_HOST', '127.0.0.1'),
     'user': os.getenv('DB_USER', 'app'),
     'password': os.getenv('DB_PASSWORD', 'very_strong'),
-    'database': os.getenv('DB_NAME', 'example'),
-    'port': os.getenv('DB_PORT', '3306')
+    'database': os.getenv('DB_NAME', 'example')
 }
 
-# Получаем название таблицы из переменной окружения
+# Название таблицы также можно вынести в переменные окружения
 TABLE_NAME = os.getenv('APP_TABLE_NAME', 'requests')
 
 @contextmanager
 def get_db_connection():
-    """Контекстный менеджер для подключения к БД"""
+    """
+    Контекстный менеджер для подключения к БД.
+    Обеспечивает правильное закрытие соединения.
+    """
     conn = None
     try:
-        conn = mysql.connector.connect(**DB_CONFIG)
+        conn = mysql.connector.connect(**db_config)
         yield conn
     except mysql.connector.Error as e:
         print(f"Ошибка подключения к БД: {e}")
-        raise
+        raise HTTPException(status_code=500, detail="Ошибка базы данных")
     finally:
-        if conn and conn.is_connected():
+        if conn is not None and conn.is_connected():
             conn.close()
 
 @app.on_event("startup")
 async def startup_event():
-    """Инициализация при запуске приложения"""
+    """Инициализация базы данных при запуске приложения"""
     print("Приложение запускается...")
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # Используем переменную TABLE_NAME вместо жестко заданного названия
             create_table_query = f"""
             CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 request_date DATETIME,
-                request_ip VARCHAR(255),
-                user_agent TEXT
+                request_ip VARCHAR(255)
             )
             """
             cursor.execute(create_table_query)
             conn.commit()
             cursor.close()
-            print(f"Таблица '{TABLE_NAME}' готова к работе")
+            print(f"Таблица '{TABLE_NAME}' готова к работе.")
     except Exception as e:
-        print(f"Ошибка инициализации БД: {e}")
+        print(f"Ошибка при инициализации БД: {e}")
 
 @app.get("/")
 async def read_root(request: Request):
-    """Главная страница с записью в БД"""
+    """Главная страница - записывает запрос в БД и возвращает время и IP"""
     client_ip = request.client.host
-    user_agent = request.headers.get('user-agent', 'Unknown')
     current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            # Используем переменную TABLE_NAME
-            query = f"INSERT INTO {TABLE_NAME} (request_date, request_ip, user_agent) VALUES (%s, %s, %s)"
-            values = (current_time, client_ip, user_agent)
+            query = f"INSERT INTO {TABLE_NAME} (request_date, request_ip) VALUES (%s, %s)"
+            values = (current_time, client_ip)
             cursor.execute(query, values)
-            
-            # Получаем общее количество записей
-            cursor.execute(f"SELECT COUNT(*) FROM {TABLE_NAME}")
-            total_requests = cursor.fetchone()[0]
-            
             conn.commit()
             cursor.close()
-
-        return {
-            "message": "Добро пожаловать в обновленное приложение!",
-            "your_ip": client_ip,
-            "time": current_time,
-            "total_requests": total_requests,
-            "table_name": TABLE_NAME,
-            "environment": "production"
-        }
-
     except mysql.connector.Error as e:
-        return {"error": f"Ошибка базы данных: {e}"}
+        return {"error": f"Ошибка при работе с базой данных: {e}"}
+
+    # Проверка правильности обращения через прокси
+    x_real_ip = request.headers.get('x-real-ip')
+    if x_real_ip is None:
+        ip_display = "похоже, что вы направляете запрос в неверный порт (например curl http://127.0.0.1:5000). Правильное выполнение задания - отправить запрос в порт 8090."
+    else:
+        ip_display = x_real_ip
+
+    return f'TIME: {current_time}, IP: {ip_display}'
 
 @app.get("/health")
 async def health_check():
-    """Проверка здоровья приложения"""
+    """Проверка состояния приложения и подключения к БД"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("SELECT 1")
             cursor.close()
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "table_name": TABLE_NAME,
-            "timestamp": datetime.now().isoformat()
-        }
+        return {"status": "healthy", "database": "connected"}
     except Exception as e:
-        return {
-            "status": "unhealthy",
-            "database": "disconnected",
-            "error": str(e)
-        }
+        return {"status": "unhealthy", "database": "disconnected", "error": str(e)}
 
 @app.get("/requests")
-async def get_requests(limit: int = 10):
-    """Получить последние запросы"""
+async def get_requests():
+    """Возвращает последние записи из базы данных"""
     try:
         with get_db_connection() as conn:
             cursor = conn.cursor()
-            query = f"SELECT id, request_date, request_ip, user_agent FROM {TABLE_NAME} ORDER BY id DESC LIMIT %s"
-            cursor.execute(query, (limit,))
+            query = f"SELECT id, request_date, request_ip FROM {TABLE_NAME} ORDER BY id DESC LIMIT 50"
+            cursor.execute(query)
             records = cursor.fetchall()
             cursor.close()
+            
+            result = []
+            for record in records:
+                result.append({
+                    "id": record[0],
+                    "request_date": record[1].strftime("%Y-%m-%d %H:%M:%S") if record[1] else None,
+                    "request_ip": record[2]
+                })
+            
+            return {
+                "total_records": len(result),
+                "records": result
+            }
+    except mysql.connector.Error as e:
+        return {"error": f"Ошибка при чтении из базы данных: {e}"}
 
-        result = []
-        for record in records:
-            result.append({
-                "id": record[0],
-                "request_date": record[1].strftime("%Y-%m-%d %H:%M:%S") if record[1] else None,
-                "request_ip": record[2],
-                "user_agent": record[3]
-            })
-
-        return {
-            "total": len(result),
-            "limit": limit,
-            "table_name": TABLE_NAME,
-            "requests": result
-        }
-    except Exception as e:
-        return {"error": f"Ошибка чтения данных: {e}"}
-
-@app.get("/config")
-async def get_config():
-    """Показать текущую конфигурацию"""
+@app.get("/debug")
+async def debug_headers(request: Request):
+    """Отладочная информация о заголовках запроса"""
     return {
-        "database_config": {
-            "host": DB_CONFIG['host'],
-            "database": DB_CONFIG['database'],
-            "port": DB_CONFIG['port']
-        },
-        "table_name": TABLE_NAME,
-        "environment": os.getenv('ENVIRONMENT', 'development')
+        "headers": dict(request.headers),
+        "client_host": request.client.host if request.client else None,
+        "x_forwarded_for": request.headers.get('x-forwarded-for'),
+        "x_real_ip": request.headers.get('x-real-ip'),
+        "forwarded": request.headers.get('forwarded')
     }
 
+# Точка входа для запуска приложения напрямую
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=5000)
