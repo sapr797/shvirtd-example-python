@@ -1,0 +1,36 @@
+include:
+  - proxy.yaml
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.python
+    restart: always
+    environment:
+      DB_HOST: db
+      DB_USER: app
+      DB_PASSWORD: QwErTy1234
+      DB_NAME: virtd
+    networks:
+      backend:
+        ipv4_address: 172.20.0.5
+
+  db:
+    image: mysql:8
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: YtReWq4321
+      MYSQL_DATABASE: virtd
+      MYSQL_USER: app
+      MYSQL_PASSWORD: QwErTy1234
+    networks:
+      backend:
+        ipv4_address: 172.20.0.10
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
