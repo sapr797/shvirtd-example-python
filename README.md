@@ -30,7 +30,39 @@
 Клиент → Nginx (8090) → HAProxy (8080) → FastAPI App (5000) → MySQL
 ```
 
-### 2. Локальный запуск для разработки
+### 2. Локальный запуск (полностью без Docker)
+
+**Создайте и активируйте виртуальное окружение**
+```bash
+# Создание виртуального окружения
+python -m venv venv
+
+# Активация (Linux/macOS)
+source venv/bin/activate
+# Активация (Windows)
+venv\Scripts\activate
+```
+**Установите зависимости**
+```bash
+pip install -r requirements.txt
+```
+
+**Запустите MySQL в Docker**
+```bash
+docker run -d --name mysql-db \
+  -e MYSQL_ROOT_PASSWORD=rootpassword \
+  -e MYSQL_DATABASE=example \
+  -e MYSQL_USER=app \
+  -e MYSQL_PASSWORD=very_strong \
+  -p 3306:3306 \
+  mysql:8.0
+```
+Примечание: Если порт 3306 занят, используйте флаг -p 3307:3306 для его переназначения.
+```
+Приложение будет доступно по адресу: http://localhost:5000
+```
+
+### 3. Локальный запуск для разработки
 
 ```bash
 # Создайте виртуальное окружение
