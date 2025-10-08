@@ -1,35 +1,41 @@
- # compose.yaml
-   version: '3.8'
+version: '3.8'
 
-  services:
-     web:
+services:
+  web:
     build:
-      context: .
+      context: .  # Укажите папку с Dockerfile.python
       dockerfile: Dockerfile.python
+    
+    # image: cr.yandex/<идентификатор_регистра>/<название_репозитория>:<версия>
+    container_name: web
     restart: always
-    ports:
-      - "8090:5000"
+    networks:
+      backend:
+        ipv4_address: 172.20.0.5
     environment:
-      DB_HOST: "db"
-      DB_USER: "app"
-      DB_PASSWORD: "very_strong"
-      DB_NAME: "example"
-    depends_on:
-      - db
+      DB_HOST: db           # Имя сервиса MySQL
+      DB_PORT: 3306
+      DB_USER: app_user     # Пользователь базы данных
+      DB_PASS: very_secure_password
+      DB_NAME: example_db   # Название базы данных
 
   db:
-    image: mysql:8.0
+    image: mysql:8
+    container_name: db
     restart: always
+    networks:
+      backend:
+        ipv4_address: 172.20.0.10
     environment:
-      MYSQL_ROOT_PASSWORD: "rootpassword"
-      MYSQL_DATABASE: "example"
-      MYSQL_USER: "app"
-      MYSQL_PASSWORD: "very_strong"
-    ports:
-      - "3308:3306"
-      
-# Добавляем сюда содержимое proxy.yaml
-proxy:
-  image: nginx:stable-alpine 
-  ports: - "80:80" 
-  volumes: - "./nginx.conf:/etc/nginx/nginx.conf"
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: example_db
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: very_secure_password
+
+networks:
+  backend:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/24
+          gateway: 172.20.0.1
