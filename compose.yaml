@@ -1,3 +1,9 @@
+ # compose.yaml
+   version: '3.8'
+
+   include:
+     - file: proxy.yaml
+
 services:
   web:
     build:
