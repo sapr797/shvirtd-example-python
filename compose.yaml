@@ -1,17 +1,8 @@
  # compose.yaml
    version: '3.8'
 
-   #include:  # не поддерживается стандартным форматом YAML-файлов Docker Compose
-   #  - file: proxy.yaml
-
-services:
- Подключение сервиса из другого yaml-файла
-  proxy:
-    extends:
-      file: proxy.yaml
-      service: proxy-service
-
-  web:
+  services:
+     web:
     build:
       context: .
       dockerfile: Dockerfile.python
@@ -36,3 +27,9 @@ services:
       MYSQL_PASSWORD: "very_strong"
     ports:
       - "3308:3306"
+      
+# Добавляем сюда содержимое proxy.yaml
+proxy:
+  image: nginx:stable-alpine 
+  ports: - "80:80" 
+  volumes: - "./nginx.conf:/etc/nginx/nginx.conf"
