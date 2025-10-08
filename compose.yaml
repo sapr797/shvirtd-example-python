@@ -1,10 +1,16 @@
  # compose.yaml
    version: '3.8'
 
-   include:
-     - file: proxy.yaml
+   #include:  # не поддерживается стандартным форматом YAML-файлов Docker Compose
+   #  - file: proxy.yaml
 
 services:
+ Подключение сервиса из другого yaml-файла
+  proxy:
+    extends:
+      file: proxy.yaml
+      service: proxy-service
+
   web:
     build:
       context: .
